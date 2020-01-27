@@ -1,11 +1,8 @@
 const User = require("../models/userModel");
-const roles = require("../roles");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-
-
-exports.allowIfLoggedin =  (req, res, next) => {
+exports.allowIfLoggedin = (req, res, next) => {
   var token = req.headers["x-access-token"];
   if (!token) {
     res.status(401).json({ message: "You need to be logged in to access" });
@@ -17,7 +14,6 @@ exports.allowIfLoggedin =  (req, res, next) => {
     next();
   });
 };
-
 
 async function validatePassword(plainPassword, hashedPassword) {
   return await bcrypt.compare(plainPassword, hashedPassword);
@@ -89,62 +85,15 @@ exports.getUser = (req, res) => {
 };
 
 exports.updateUserProfile = (req, res) => {
-  var token = req.headers["x-access-token"];
-  if (!token) {
-    res.status(401).send({ auth: false, message: "No token provided" });
-  }
-  jwt.verify(token, process.env.JWT_SECRET, function(err, decoded) {
-    if (err) {
-      res.status(500).send({ auth: false, message: "failed to auth token" });
-    }
-    User.findByIdAndUpdate(
-      { _id: decoded.userId },
-      req.body,
-      (err, updatedUser) => {
-        if (err) {
-          res.send(err);
-        } else {
-          res.status(200).json({
-            data: updatedUser,
-            message: "User credentials have been updated"
-          });
-        }
+  User.findByIdAndUpdate(req.params.id,req.body,(err, updatedUser) => {
+      if (err) {
+        res.send(err);
+      } else {
+        res.status(200).json({
+          data: updatedUser,
+          message: "User credentials have been updated"
+        });
       }
-    );
-  });
-};
-
-exports.getUsers = async (req, res, next) => {
-  const users = await User.find({});
-  res.status(200).send({
-    data: users
-  });
-};
-
-exports.updateUser = async (req, res, next) => {
-  try {
-    const update = req.body;
-    const userId = req.params.userId;
-    await User.findByIdAndUpdate(userId, update);
-    const user = await User.findById(userId);
-    res.status(200).json({
-      data: user,
-      message: "User has been updated"
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.deleteUser = (req, res, next) => {
-  User.findByIdAndRemove(req.params.id, (err,doc) => {
-    if (err) {
-      res.status(500).send();
     }
-    res.status(200).send({
-      data: doc,
-      message: "User deleted successfully"
-    });
-  });
+  );
 };
-
