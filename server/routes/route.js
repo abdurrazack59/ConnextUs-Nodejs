@@ -7,29 +7,30 @@ router.post("/signup", userController.signup);
 router.post("/login", userController.login);
 
 router.get(
-  "/user/:userId",
+  "/user/getUserDetails/:email",
   userController.allowIfLoggedin,
   userController.getUser
 );
 
+router.put("/user/updateUserProfile", userController.updateUserProfile);
+
+// Admin Routes...
+
 router.get(
-  "/users",
+  "/users/getAllUsers",
   userController.allowIfLoggedin,
-  userController.grantAccess("readAny", "profile"),
   userController.getUsers
 );
 
 router.put(
-  "/user/:userId",
+  "/user/updateUser/:id",
   userController.allowIfLoggedin,
-  userController.grantAccess("updateAny", "profile"),
   userController.updateUser
 );
 
 router.delete(
-  "/user/:userId",
+  "/user/deleteUser/:id",
   userController.allowIfLoggedin,
-  userController.grantAccess("deleteAny", "profile"),
   userController.deleteUser
 );
 

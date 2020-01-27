@@ -3,52 +3,67 @@ const roles = require("../roles");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-async function hashPassword(password) {
-  return await bcrypt.hash(password, 10);
-}
+
+
+exports.allowIfLoggedin =  (req, res, next) => {
+  var token = req.headers["x-access-token"];
+  if (!token) {
+    res.status(401).json({ message: "You need to be logged in to access" });
+  }
+  jwt.verify(token, process.env.JWT_SECRET, function(err) {
+    if (err) {
+      res.status(500).json({ message: "failed to auth token" });
+    }
+    next();
+  });
+};
+
 
 async function validatePassword(plainPassword, hashedPassword) {
   return await bcrypt.compare(plainPassword, hashedPassword);
 }
 
-exports.signup = async (req, res, next) => {
-  try {
-    const { email, password, role } = req.body;
-    const hashedPassword = await hashPassword(password);
-    const newUser = new User({
-      email,
-      password: hashedPassword,
-      role: role || "basic"
-    });
-    // const accessToken = jwt.sign(
-    //   { userId: newUser._id },
-    //   process.env.JWT_SECRET,
-    //   {
-    //     expiresIn: "1d"
-    //   }
-    // );
-    // newUser.accessToken = accessToken;
-    await newUser.save();
-    res.json({
-      data: newUser,
-      // accessToken
-    });
-  } catch (error) {
-    next(error);
-  }
+exports.signup = (req, res) => {
+  let userData = req.body;
+  let newUser = new User(userData);
+  User.findOne({ email: userData.email }, (err, user) => {
+    if (err) {
+      console.log(err);
+      res.send(err);
+    }
+    //if a user was found, that means the user's email matches the entered email
+    if (user) {
+      res.status(400).send({
+        message: "This email has already been registered"
+      });
+    } else {
+      bcrypt.hash(userData.password, 10, (err, hash) => {
+        newUser.password = hash;
+        newUser.save((err, registeredUser) => {
+          if (err) {
+            res.status(500).send("Error in registering new user");
+          } else {
+            res.status(200).send({
+              data: registeredUser
+            });
+          }
+        });
+      });
+    }
+  });
 };
 
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user){
-      res.status(401).json({message:"Email does not exist"});
-    } 
+    if (!user) {
+      res.status(401).json({ message: "Email does not exist" });
+    }
     const validPassword = await validatePassword(password, user.password);
     if (!validPassword) {
-      res.status(422).json({message:"Password is not correct"});
-    } 
+      res.status(422).json({ message: "Password is not correct" });
+    }
     const accessToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d"
     });
@@ -62,26 +77,48 @@ exports.login = async (req, res, next) => {
   }
 };
 
-exports.getUsers = async (req, res, next) => {
-  const users = await User.find({});
-  res.status(200).json({
-    data: users
+exports.getUser = (req, res) => {
+  let email = req.params.email;
+  User.findOne({ email: email }, (error, user) => {
+    if (error) {
+      res.status(404).send("User Not Found");
+    } else {
+      res.status(200).send(user);
+    }
   });
 };
 
-exports.getUser = async (req, res, next) => {
-  try {
-    const userId = req.params.userId;
-    const user = await User.findById(userId);
-    if (!user){
-      return next(new Error("User does not exist"));
-    }
-    res.status(200).json({
-      data: user
-    });
-  } catch (error) {
-    next(error);
+exports.updateUserProfile = (req, res) => {
+  var token = req.headers["x-access-token"];
+  if (!token) {
+    res.status(401).send({ auth: false, message: "No token provided" });
   }
+  jwt.verify(token, process.env.JWT_SECRET, function(err, decoded) {
+    if (err) {
+      res.status(500).send({ auth: false, message: "failed to auth token" });
+    }
+    User.findByIdAndUpdate(
+      { _id: decoded.userId },
+      req.body,
+      (err, updatedUser) => {
+        if (err) {
+          res.send(err);
+        } else {
+          res.status(200).json({
+            data: updatedUser,
+            message: "User credentials have been updated"
+          });
+        }
+      }
+    );
+  });
+};
+
+exports.getUsers = async (req, res, next) => {
+  const users = await User.find({});
+  res.status(200).send({
+    data: users
+  });
 };
 
 exports.updateUser = async (req, res, next) => {
@@ -99,45 +136,15 @@ exports.updateUser = async (req, res, next) => {
   }
 };
 
-exports.deleteUser = async (req, res, next) => {
-  try {
-    const userId = req.params.userId;
-    await User.findByIdAndDelete(userId);
-    res.status(200).json({
-      data: null,
-      message: "User has been deleted"
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.grantAccess = function(action, resource) {
-  return async (req, res, next) => {
-    try {
-      const permission = roles.can(req.user.role);
-      if (!permission.granted) {
-        return res.status(401).json({
-          error: "You don't have enough permission to perform this action"
-        });
-      }
-      next();
-    } catch (error) {
-      next(error);
+exports.deleteUser = (req, res, next) => {
+  User.findByIdAndRemove(req.params.id, (err,doc) => {
+    if (err) {
+      res.status(500).send();
     }
-  };
+    res.status(200).send({
+      data: doc,
+      message: "User deleted successfully"
+    });
+  });
 };
 
-exports.allowIfLoggedin = async (req, res, next) => {
-  try {
-    const user = res.locals.loggedInUser;
-    if (!user)
-      return res.status(401).json({
-        error: "You need to be logged in to access this route"
-      });
-    req.user = user;
-    next();
-  } catch (error) {
-    next(error);
-  }
-};

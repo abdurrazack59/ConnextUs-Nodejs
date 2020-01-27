@@ -15,7 +15,7 @@ const app = express();
 // middlewares
 app.use(cors());
 app.use(bodyParser.json());
-app.use("/api", routes);
+app.use("/", routes);
 
 require("dotenv").config({
   path: path.join(__dirname, "./.env")
@@ -33,10 +33,6 @@ mongoose.connect(
     }
   }
 );
-
-// app.listen(PORT, () => {
-//   console.log("Server is running on port:" + PORT);
-// });
 
 app.use(async (req, res, next) => {
   if (req.headers["x-access-token"]) {
