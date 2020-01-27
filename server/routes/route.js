@@ -10,7 +10,7 @@ router.post("/login", userController.login);
 // -------------------------------------User Routes Start-------------------------------------//
 
 router.get(
-  "/user/getUserDetails/:email",
+  "/user/getUserDetails/:id",
   userController.allowIfLoggedin,
   userController.getUser
 );

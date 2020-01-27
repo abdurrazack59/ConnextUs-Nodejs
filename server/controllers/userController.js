@@ -65,7 +65,7 @@ exports.login = async (req, res, next) => {
     });
     await User.findByIdAndUpdate(user._id, { accessToken });
     res.status(200).json({
-      data: { email: user.email, role: user.role },
+      data: {_id:user._id, email: user.email, role: user.role },
       accessToken
     });
   } catch (error) {
@@ -74,8 +74,8 @@ exports.login = async (req, res, next) => {
 };
 
 exports.getUser = (req, res) => {
-  let email = req.params.email;
-  User.findOne({ email: email }, (error, user) => {
+  let id = req.params.id;
+  User.findOne({ _id: id }, (error, user) => {
     if (error) {
       res.status(404).send("User Not Found");
     } else {
@@ -87,7 +87,9 @@ exports.getUser = (req, res) => {
 exports.updateUserProfile = (req, res) => {
   User.findByIdAndUpdate(req.params.id,req.body,(err, updatedUser) => {
       if (err) {
-        res.send(err);
+        res.send({
+          message: "Error in updating user details"
+        });
       } else {
         res.status(200).json({
           data: updatedUser,
