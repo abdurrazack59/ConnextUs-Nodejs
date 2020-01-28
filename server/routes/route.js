@@ -16,6 +16,7 @@ router.get(
 );
 
 router.put("/user/updateUserProfile/:id", userController.updateUserProfile);
+router.post("/user/sendEmail", userController.sendEmail);
 
 // -------------------------------------User Routes End-------------------------------------//
 
