@@ -15,8 +15,14 @@ router.get(
   userController.getUser
 );
 
-router.put("/user/updateUserProfile/:id", userController.updateUserProfile);
+router.put(
+  "/user/updateUserProfile/:id",
+  userController.allowIfLoggedin,
+  userController.updateUserProfile
+);
 router.post("/user/sendEmail", userController.sendEmail);
+router.post("/user/sendOtp", userController.sendOtp);
+router.post("/user/verifyOtp", userController.verifyOtp);
 
 // -------------------------------------User Routes End-------------------------------------//
 

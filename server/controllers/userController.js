@@ -1,14 +1,15 @@
 const User = require("../models/userModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-var nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
+const Nexmo = require("nexmo");
 
 exports.allowIfLoggedin = (req, res, next) => {
   var token = req.headers["x-access-token"];
   if (!token) {
     res.status(401).json({ message: "You need to be logged in to access" });
   }
-  jwt.verify(token, process.env.JWT_SECRET, function (err) {
+  jwt.verify(token, process.env.JWT_SECRET, function(err) {
     if (err) {
       res.status(500).json({ message: "failed to auth token" });
     }
@@ -30,7 +31,7 @@ exports.signup = (req, res) => {
     }
     //if a user was found, that means the user's email matches the entered email
     if (user) {
-      res.status(400).send({
+      res.status(409).send({
         message: "This email has already been registered"
       });
     } else {
@@ -97,27 +98,26 @@ exports.updateUserProfile = (req, res) => {
         message: "User credentials have been updated"
       });
     }
-  }
-  );
+  });
 };
 
 exports.sendEmail = (req, res) => {
   let email = req.body.email;
   var transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: {
-      user: 'abdurrazack13@gmail.com',
-      pass: '$ password $'
+      user: process.env.AUTH_EMAIL_ID,
+      pass: process.env.AUTH_EMAIL_PASSWORD
     }
   });
 
   var mailOptions = {
-    from: 'abdurrazack13@gmail.com',
+    from: process.env.AUTH_EMAIL_ID,
     to: email,
-    subject: 'Sending Email using Node.js',
+    subject: "Sending Email using Node.js",
     text: `Hi,
 This email was sent by nodemailer which is package used to send mails using node js.`
-    // html: '<h1>Hi Smartherd</h1><p>Your Messsage</p>'        
+    // html: '<h1>Hi Smartherd</h1><p>Your Messsage</p>'
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
@@ -125,14 +125,65 @@ This email was sent by nodemailer which is package used to send mails using node
       console.log(error);
       res.status(500).send({
         message: "Internal server error"
-      })
+      });
     } else {
-      console.log('Email sent: ' + info.response);
+      console.log("Email sent: " + info.response);
       res.send({
-        message: `Email has been sent to ${req.body.email}`,
+        message: `Email has been sent to ${req.body.email}`
         // data: info.response
-      })
+      });
     }
   });
+};
 
-}
+exports.sendOtp = (req, res) => {
+  const nexmo = new Nexmo({
+    apiKey: process.env.NEXMO_API_KEY,
+    apiSecret: process.env.NEXMO_API_SECRET
+  });
+
+  let mobilenumber = req.body.mobilenumber;
+
+  nexmo.verify.request(
+    { number: mobilenumber, brand:process.env.NEXMO_BRAND_NAME},
+    (err, result) => {
+      if (err) {
+        res.status(500).send({
+          message: "Internal server error"
+        });
+      } else {
+        let requestId = result.request_id;
+        if (result.status == "0") {
+          res.send({
+            requestId: requestId,
+            message: "Success sending OTP"
+          });
+        } else {
+          res.status(401).send(result.error_text);
+        }
+      }
+    }
+  );
+};
+
+exports.verifyOtp = (req, res) => {
+  const nexmo = new Nexmo({
+    apiKey: process.env.NEXMO_API_KEY,
+    apiSecret: process.env.NEXMO_API_SECRET
+  });
+
+  let pin = req.body.pin;
+  let requestId = req.body.requestId;
+
+  nexmo.verify.check({ request_id: requestId, code: pin }, (err, result) => {
+    if (err) {
+      res.send(err);
+    } else {
+      if (result && result.status == "0") {
+        res.status(200).send({ message: "Account verified"});
+      } else {
+        res.status(401).send({ message: "Unverified account"});
+      }
+    }
+  });
+};
