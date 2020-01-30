@@ -4,14 +4,16 @@ const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const Nexmo = require("nexmo");
 
-exports.allowIfLoggedin = (req, res, next) => {
+exports.allowIfLoggedin = (req, res ,next) => {
   var token = req.headers["x-access-token"];
   if (!token) {
-    res.status(401).json({ message: "You need to be logged in to access" });
+    return res
+      .status(401)
+      .send({ message: "You need to be logged in to access" });
   }
   jwt.verify(token, process.env.JWT_SECRET, function(err) {
     if (err) {
-      res.status(500).json({ message: "failed to auth token" });
+      return res.status(500).send({ message: "failed to auth token" });
     }
     next();
   });
@@ -56,17 +58,17 @@ exports.login = async (req, res, next) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) {
-      res.status(401).json({ message: "Email does not exist" });
+      res.status(401).send({ message: "Email does not exist" });
     }
     const validPassword = await validatePassword(password, user.password);
     if (!validPassword) {
-      res.status(422).json({ message: "Password is not correct" });
+      res.status(422).send({ message: "Password is not correct" });
     }
     const accessToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d"
     });
     await User.findByIdAndUpdate(user._id, { accessToken });
-    res.status(200).json({
+    res.status(200).send({
       data: { _id: user._id, email: user.email, role: user.role },
       accessToken
     });
@@ -77,9 +79,11 @@ exports.login = async (req, res, next) => {
 
 exports.getUser = (req, res) => {
   let id = req.params.id;
-  User.findOne({ _id: id }, (error, user) => {
-    if (error) {
-      res.status(404).send("User Not Found");
+  User.findOne({ _id: id }, (err, user) => {
+    if (err) {
+     return res.status(404).send({
+       message: "User Not Found"
+     });
     } else {
       res.status(200).send(user);
     }
@@ -87,15 +91,19 @@ exports.getUser = (req, res) => {
 };
 
 exports.updateUserProfile = (req, res) => {
-  User.findByIdAndUpdate(req.params.id, req.body, (err, updatedUser) => {
+  id = req.params.id;
+  update = req.body;
+  User.findByIdAndUpdate(id, update, (err) => {
     if (err) {
-      res.send({
+     return res.send({
         message: "Error in updating user details"
       });
     } else {
-      res.status(200).json({
-        data: updatedUser,
-        message: "User credentials have been updated"
+      User.findById(id, (err, updatedUser) => {
+        res.status(200).send({
+          message: "User credentials have been updated",
+          data: updatedUser
+        });
       });
     }
   });
@@ -120,8 +128,8 @@ This email was sent by nodemailer which is package used to send mails using node
     // html: '<h1>Hi Smartherd</h1><p>Your Messsage</p>'
   };
 
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
+  transporter.sendMail(mailOptions, (err, info) => {
+    if (err) {
       console.log(error);
       res.status(500).send({
         message: "Internal server error"
@@ -145,7 +153,7 @@ exports.sendOtp = (req, res) => {
   let mobilenumber = req.body.mobilenumber;
 
   nexmo.verify.request(
-    { number: mobilenumber, brand:process.env.NEXMO_BRAND_NAME},
+    { number: mobilenumber, brand: process.env.NEXMO_BRAND_NAME },
     (err, result) => {
       if (err) {
         res.status(500).send({
@@ -180,9 +188,9 @@ exports.verifyOtp = (req, res) => {
       res.send(err);
     } else {
       if (result && result.status == "0") {
-        res.status(200).send({ message: "Account verified"});
+        res.status(200).send({ message: "Account verified" });
       } else {
-        res.status(401).send({ message: "Unverified account"});
+        res.status(401).send({ message: "Unverified account" });
       }
     }
   });
